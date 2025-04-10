@@ -12,6 +12,10 @@ services:
         condition: service_healthy
     networks:
       - app-network
+    resources:
+      limits:
+        cpus: '1.0'
+        memory: 1024M
 
   db:
     image: postgres:15-alpine
@@ -30,6 +34,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    resources:
+      limits:
+        cpus: '1.0'
+        memory: 2048M
 
 networks:
   app-network:
