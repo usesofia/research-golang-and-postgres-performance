@@ -125,8 +125,6 @@ function createTagsForOrganization(orgId) {
   const tagIds = [];
   const nTagsPerOrganization = 32;
 
-  console.log(`createTagsForOrganization(${orgId})`);
-  
   // Validate organization ID
   if (!orgId || orgId <= 0) {
     console.log(`Invalid organization ID: ${orgId}, skipping tag creation`);
@@ -136,8 +134,6 @@ function createTagsForOrganization(orgId) {
   for (let i = 0; i < nTagsPerOrganization; i++) {
     try {
       const numberOfTags = getNumberOfTags(orgId);
-
-      console.log({numberOfTags, orgId});
 
       if(numberOfTags >= nTagsPerOrganization) {
         break;
@@ -219,8 +215,6 @@ export default function () {
   // Randomly select an organization ID (1-10)
   const orgId = Math.max(1, (exec.vu.idInTest % 10) + 1);
 
-  console.log({orgId});
-  
   createTagsForOrganization(orgId);
   
   // Create 32 financial records
@@ -232,7 +226,4 @@ export default function () {
       console.log(`Error creating financial record: ${error}`);
     }
   }
-  
-  // Sleep for 1 second
-  sleep(1);
 }
