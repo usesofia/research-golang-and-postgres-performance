@@ -182,3 +182,57 @@ func getCashFlowReport(db *gorm.DB) gin.HandlerFunc {
 		c.JSON(http.StatusOK, report)
 	}
 }
+
+func listTags(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID, err := strconv.ParseUint(c.Param("organizationId"), 10, 32)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid organization ID"})
+			return
+		}
+
+		// Parse pagination parameters
+		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+		pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+
+		// Ensure page and pageSize are positive
+		if page < 1 {
+			page = 1
+		}
+		if pageSize < 1 {
+			pageSize = 20
+		}
+
+		// Calculate offset
+		offset := (page - 1) * pageSize
+
+		// Get total count for pagination
+		var total int64
+		if err := db.Model(&Tag{}).Where("organization_id = ?", orgID).Count(&total).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		var tags []Tag
+		if err := db.Where("organization_id = ?", orgID).
+			Offset(offset).
+			Limit(pageSize).
+			Find(&tags).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Calculate total pages
+		totalPages := (total + int64(pageSize) - 1) / int64(pageSize)
+
+		c.JSON(http.StatusOK, gin.H{
+			"data": tags,
+			"pagination": gin.H{
+				"current_page": page,
+				"page_size":    pageSize,
+				"total_items":  total,
+				"total_pages": totalPages,
+			},
+		})
+	}
+}

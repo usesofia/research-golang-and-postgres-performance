@@ -1,5 +1,6 @@
 import http from 'k6/http';
 import { sleep, check } from 'k6';
+import exec from 'k6/execution';
 
 export const options = {
   vus: 100,
@@ -9,9 +10,6 @@ export const options = {
 
 // Base URL for the API
 const BASE_URL = 'http://localhost:8080';
-
-// Store tag IDs by organization
-const organizationTags = {};
 
 // Function to generate a random tag name
 function generateRandomTagName() {
@@ -35,21 +33,41 @@ function generateRandomDate() {
 
 // Function to get random tags for an organization
 function getRandomTags(orgId, count) {
-  if (!organizationTags[orgId] || organizationTags[orgId].length === 0) {
-    return [];
+  for(let attempt = 0; attempt < 32; attempt++) {
+    try {
+      const response = http.get(`${BASE_URL}/organizations/${orgId}/tags`);
+      
+      if (response.status !== 200) {
+        console.log(`Error getting tags for organization ${orgId}: API returned status ${response.status}`);
+        continue;
+      }
+      
+      const responseBody = JSON.parse(response.body);
+      if (!responseBody.data || !Array.isArray(responseBody.data)) {
+        console.log(`Error getting tags for organization ${orgId}: Invalid response format`);
+        continue;
+      }
+      
+      const tags = responseBody.data;
+      const availableTags = tags.map(tag => tag.ID);
+      const selectedTags = [];
+      const numTags = Math.min(count, availableTags.length);
+      
+      for (let i = 0; i < numTags; i++) {
+        const randomIndex = Math.floor(Math.random() * availableTags.length);
+        selectedTags.push(availableTags[randomIndex]);
+        availableTags.splice(randomIndex, 1);
+      }
+      
+      return selectedTags;
+    } catch (error) {
+      console.log(`Error getting random tags for organization ${orgId}: ${error}`);
+    }
   }
   
-  const availableTags = [...organizationTags[orgId]];
-  const selectedTags = [];
-  const numTags = Math.min(count, availableTags.length);
-  
-  for (let i = 0; i < numTags; i++) {
-    const randomIndex = Math.floor(Math.random() * availableTags.length);
-    selectedTags.push(availableTags[randomIndex]);
-    availableTags.splice(randomIndex, 1);
-  }
-  
-  return selectedTags;
+  // Return empty array instead of throwing error
+  console.log(`Failed to get random tags for organization ${orgId} after multiple attempts, returning empty array`);
+  return [];
 }
 
 // Function to create a financial record
@@ -58,22 +76,42 @@ function createFinancialRecord(orgId) {
   const amount = Math.floor(Math.random() * 10000) + 1;
   const dueDate = generateRandomDate();
   const numTags = Math.floor(Math.random() * 4); // 0 to 3 tags
-  const tags = getRandomTags(orgId, numTags);
+  
+  let tags = [];
+  try {
+    tags = getRandomTags(orgId, numTags);
+  } catch (error) {
+    console.log(`Error getting tags for financial record: ${error}`);
+    // Continue without tags if there's an error
+  }
+  
+  // Ensure tags is an array and IDs are valid
+  const validTags = Array.isArray(tags) ? tags.filter(id => id && typeof id === 'number') : [];
+  
+  const payload = {
+    direction,
+    amount,
+    dueDate
+  };
+  
+  // Only add tags if we have valid ones
+  if (validTags.length > 0) {
+    payload.tags = validTags.map(tagId => ({ id: tagId }));
+  }
   
   const response = http.post(
     `${BASE_URL}/organizations/${orgId}/financial-records`,
-    JSON.stringify({
-      direction,
-      amount,
-      dueDate,
-      tags: tags.map(tagId => ({ id: tagId }))
-    }),
+    JSON.stringify(payload),
     {
       headers: {
         'Content-Type': 'application/json',
       },
     }
   );
+
+  if (response.status !== 201) {
+    console.log(`Failed to create financial record: ${response.status} ${response.body}`);
+  }
 
   check(response, {
     'is status 201': (r) => r.status === 201,
@@ -83,63 +121,118 @@ function createFinancialRecord(orgId) {
 }
 
 // Function to create tags for an organization
-function createTagsForOrganization(orgId, count) {
+function createTagsForOrganization(orgId) {
   const tagIds = [];
-  
-  for (let i = 0; i < count; i++) {
-    const tagName = generateRandomTagName();
-    
-    const response = http.post(
-      `${BASE_URL}/organizations/${orgId}/tags`,
-      JSON.stringify({ name: tagName }),
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+  const nTagsPerOrganization = 32;
 
-    check(response, {
-      'is status 201': (r) => r.status === 201,
-    });
-    
-    if (response.status === 201) {
-      const tagData = JSON.parse(response.body);
-      tagIds.push(tagData.id);
+  console.log(`createTagsForOrganization(${orgId})`);
+  
+  // Validate organization ID
+  if (!orgId || orgId <= 0) {
+    console.log(`Invalid organization ID: ${orgId}, skipping tag creation`);
+    return tagIds;
+  }
+  
+  for (let i = 0; i < nTagsPerOrganization; i++) {
+    try {
+      const numberOfTags = getNumberOfTags(orgId);
+
+      console.log({numberOfTags, orgId});
+
+      if(numberOfTags >= nTagsPerOrganization) {
+        break;
+      }
+
+      const tagName = generateRandomTagName();
+      
+      // Ensure tag name is not empty
+      if (!tagName) {
+        console.log(`Generated empty tag name, skipping`);
+        continue;
+      }
+
+      const response = http.post(
+        `${BASE_URL}/organizations/${orgId}/tags`,
+        JSON.stringify({ name: tagName }),
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.status !== 201) {
+        console.log(`Failed to create tag for organization ${orgId}: ${response.status} ${response.body}`);
+        continue;
+      }
+
+      check(response, {
+        'is status 201': (r) => r.status === 201,
+      });
+      
+      if (response.status === 201) {
+        try {
+          const tagData = JSON.parse(response.body);
+          if (tagData && tagData.id) {
+            tagIds.push(tagData.id);
+          }
+        } catch (parseError) {
+          console.log(`Error parsing tag response: ${parseError}`);
+        }
+      }
+    } catch (error) {
+      console.log(`Error in tag creation loop: ${error}`);
     }
   }
   
   return tagIds;
 }
 
+function getNumberOfTags(orgId) {
+  for(let attempt = 0; attempt < 32; attempt++) {
+    try {
+      const response = http.get(`${BASE_URL}/organizations/${orgId}/tags`);
+      
+      if (response.status !== 200) {
+        console.log(`Error getting number of tags for organization ${orgId}: API returned status ${response.status}`);
+        continue;
+      }
+      
+      const responseBody = JSON.parse(response.body);
+      if (!responseBody.pagination || typeof responseBody.pagination.total_items !== 'number') {
+        console.log(`Error getting number of tags for organization ${orgId}: Invalid response format`);
+        continue;
+      }
+      
+      return responseBody.pagination.total_items;
+    } catch (error) {
+      console.log(`Error getting number of tags for organization ${orgId}: ${error}`);
+    }
+  }
+  
+  // Return default value instead of throwing error
+  console.log(`Failed to get number of tags for organization ${orgId} after multiple attempts, returning 0`);
+  return 0;
+}
+
 export default function () {
   // Randomly select an organization ID (1-10)
-  const orgId = Math.floor(Math.random() * 10) + 1;
+  const orgId = Math.max(1, (exec.vu.idInTest % 10) + 1);
+
+  console.log({orgId});
   
-  // Initialize organization tags if not already done
-  if (!organizationTags[orgId]) {
-    // Create 5 tags for this organization
-    organizationTags[orgId] = createTagsForOrganization(orgId, 20);
-  }
+  createTagsForOrganization(orgId);
   
-  // Create 32 financial records in parallel (chunks of 8)
-  const chunks = 4; // 4 chunks of 8 records each
-  const recordsPerChunk = 8;
-  
-  for (let chunk = 0; chunk < chunks; chunk++) {
-    const promises = [];
-    
-    for (let i = 0; i < recordsPerChunk; i++) {
-      promises.push(createFinancialRecord(orgId));
+  // Create 32 financial records
+  for (let i = 0; i < 32; i++) {
+    // Create records sequentially in this chunk
+    try {
+      createFinancialRecord(orgId);
+    } catch (error) {
+      console.log(`Error creating financial record: ${error}`);
     }
-    
-    // Wait for all records in this chunk to be created
-    Promise.all(promises);
-    
-    // Sleep for a short time between chunks
-    sleep(0.5);
   }
   
-  // Sleep for 1 second as requested
+  // Sleep for 1 second
   sleep(1);
 }
