@@ -71,7 +71,7 @@ function getRandomTags(orgId, count) {
 }
 
 // Function to create a financial record
-function createFinancialRecord(orgId) {
+function createFinancialRecord(orgId, count) {
   const direction = Math.random() > 0.5 ? 'IN' : 'OUT';
   const amount = Math.floor(Math.random() * 10000) + 1;
   const dueDate = generateRandomDate();
@@ -99,25 +99,22 @@ function createFinancialRecord(orgId) {
     payload.tags = validTags.map(tagId => ({ id: tagId }));
   }
   
-  const response = http.post(
-    `${BASE_URL}/organizations/${orgId}/financial-records`,
-    JSON.stringify(payload),
-    {
+  const responses = http.batch(
+    Array.from({ length: count }, () => ({
+      method: 'POST',
+      url: `${BASE_URL}/organizations/${orgId}/financial-records`,
+      body: JSON.stringify(payload),
       headers: {
         'Content-Type': 'application/json',
       },
-    }
+    }))
   );
 
-  if (response.status !== 201) {
-    console.log(`Failed to create financial record: ${response.status} ${response.body}`);
-  }
-
-  check(response, {
-    'is status 201': (r) => r.status === 201,
+  responses.forEach(response => {
+    if (response.status !== 201) {
+      console.log(`Failed to create financial record: ${response.status} ${response.body}`);
+    }
   });
-  
-  return response;
 }
 
 // Function to create tags for an organization
@@ -217,11 +214,11 @@ export default function () {
 
   createTagsForOrganization(orgId);
   
-  // Create 32 financial records
-  for (let i = 0; i < 32; i++) {
+  // Create 32 financial records, 4 chunks of 8 records each
+  for (let i = 0; i < 4; i++) {
     // Create records sequentially in this chunk
     try {
-      createFinancialRecord(orgId);
+      createFinancialRecord(orgId, 8);
     } catch (error) {
       console.log(`Error creating financial record: ${error}`);
     }
