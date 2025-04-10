@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -39,6 +40,7 @@ func createFinancialRecord(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var record FinancialRecord
 		if err := c.ShouldBindJSON(&record); err != nil {
+			fmt.Println("Error binding JSON:", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
