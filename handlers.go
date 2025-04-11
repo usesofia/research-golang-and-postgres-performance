@@ -74,6 +74,48 @@ func createFinancialRecord(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+func createFinancialRecordsBulk(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var records []FinancialRecord
+		if err := c.ShouldBindJSON(&records); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Get organizationId from path
+		orgID, err := strconv.ParseUint(c.Param("organizationId"), 10, 32)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid organization ID"})
+			return
+		}
+
+		// Validate and set organization ID for all records
+		for i := range records {
+			records[i].OrganizationID = uint(orgID)
+
+			// Validate direction
+			if records[i].Direction != "IN" && records[i].Direction != "OUT" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Direction must be either 'IN' or 'OUT'"})
+				return
+			}
+
+			// Validate amount
+			if records[i].Amount < 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Amount must be greater than or equal to zero"})
+				return
+			}
+		}
+
+		// Create all records in a single transaction
+		if err := db.Create(&records).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusCreated, records)
+	}
+}
+
 func listFinancialRecords(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID, err := strconv.ParseUint(c.Param("organizationId"), 10, 32)

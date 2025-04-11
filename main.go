@@ -31,6 +31,7 @@ func main() {
 	r.POST("/organizations/:organizationId/tags", createTag(db))
 	r.GET("/organizations/:organizationId/tags", listTags(db))
 	r.POST("/organizations/:organizationId/financial-records", createFinancialRecord(db))
+	r.POST("/organizations/:organizationId/financial-records/bulk", createFinancialRecordsBulk(db))
 	r.GET("/organizations/:organizationId/financial-records", listFinancialRecords(db))
 	r.GET("/organizations/:organizationId/financial-records/reports/cash-flow", getCashFlowReport(db))
 

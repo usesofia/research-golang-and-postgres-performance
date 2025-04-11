@@ -31,8 +31,8 @@ function generateRandomDate() {
   return new Date(randomTime).toISOString()
 }
 
-// Function to get random tags for an organization
-function getRandomTags(orgId, count) {
+// Function to get all tags for an organization
+function getAllTags(orgId) {
   for(let attempt = 0; attempt < 32; attempt++) {
     try {
       const response = http.get(`${BASE_URL}/organizations/${orgId}/tags`);
@@ -48,73 +48,64 @@ function getRandomTags(orgId, count) {
         continue;
       }
       
-      const tags = responseBody.data;
-      const availableTags = tags.map(tag => tag.ID);
-      const selectedTags = [];
-      const numTags = Math.min(count, availableTags.length);
-      
-      for (let i = 0; i < numTags; i++) {
-        const randomIndex = Math.floor(Math.random() * availableTags.length);
-        selectedTags.push(availableTags[randomIndex]);
-        availableTags.splice(randomIndex, 1);
-      }
-      
-      return selectedTags;
+      return responseBody.data;
     } catch (error) {
-      console.log(`Error getting random tags for organization ${orgId}: ${error}`);
+      console.log(`Error getting tags for organization ${orgId}: ${error}`);
     }
   }
   
   // Return empty array instead of throwing error
-  console.log(`Failed to get random tags for organization ${orgId} after multiple attempts, returning empty array`);
+  console.log(`Failed to get tags for organization ${orgId} after multiple attempts, returning empty array`);
   return [];
 }
 
-// Function to create a financial record
-function createFinancialRecord(orgId, count) {
-  const direction = Math.random() > 0.5 ? 'IN' : 'OUT';
-  const amount = Math.floor(Math.random() * 10000) + 1;
-  const dueDate = generateRandomDate();
-  const numTags = Math.floor(Math.random() * 4); // 0 to 3 tags
+// Function to select random tags from an array of tags
+function selectRandomTags(tags, count) {
+  const availableTags = tags;
+  const selectedTags = [];
+  const numTags = Math.min(count, availableTags.length);
   
-  let tags = [];
-  try {
-    tags = getRandomTags(orgId, numTags);
-  } catch (error) {
-    console.log(`Error getting tags for financial record: ${error}`);
-    // Continue without tags if there's an error
+  for (let i = 0; i < numTags; i++) {
+    const randomIndex = Math.floor(Math.random() * availableTags.length);
+    selectedTags.push(availableTags[randomIndex]);
+    availableTags.splice(randomIndex, 1);
   }
   
-  // Ensure tags is an array and IDs are valid
-  const validTags = Array.isArray(tags) ? tags.filter(id => id && typeof id === 'number') : [];
-  
-  const payload = {
-    direction,
-    amount,
-    dueDate
-  };
-  
-  // Only add tags if we have valid ones
-  if (validTags.length > 0) {
-    payload.tags = validTags.map(tagId => ({ id: tagId }));
-  }
-  
-  const responses = http.batch(
-    Array.from({ length: count }, () => ({
-      method: 'POST',
-      url: `${BASE_URL}/organizations/${orgId}/financial-records`,
-      body: JSON.stringify(payload),
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }))
-  );
+  return selectedTags;
+}
 
-  responses.forEach(response => {
-    if (response.status !== 201) {
-      console.log(`Failed to create financial record: ${response.status} ${response.body}`);
-    }
+// Function to create a financial records
+function createFinancialRecords(orgId, count) {
+  const tags = getAllTags(orgId);
+  let payloads = [];
+
+  for(let i = 0; i < count; i++) {
+    const direction = Math.random() > 0.5 ? 'IN' : 'OUT';
+    const amount = Math.floor(Math.random() * 10000) + 1;
+    const dueDate = generateRandomDate();
+    const numTags = Math.floor(Math.random() * 4); // 0 to 3 tags
+
+    const payload = {
+      direction,
+      amount,
+      dueDate,
+      tags: selectRandomTags(tags, numTags)
+    };
+
+    payloads.push(payload);
+  }
+
+  // console.log({payloads});
+  
+  const response = http.post(`${BASE_URL}/organizations/${orgId}/financial-records/bulk`, JSON.stringify(payloads), {
+    headers: {
+      'Content-Type': 'application/json',
+    },
   });
+
+  if (response.status !== 201) {
+    console.log(`Failed to create financial records: ${response.status} ${response.body}`);
+  }
 }
 
 // Function to create tags for an organization
@@ -213,14 +204,5 @@ export default function () {
   const orgId = Math.max(1, (exec.vu.idInTest % 10) + 1);
 
   createTagsForOrganization(orgId);
-  
-  // Create 32 financial records, 4 chunks of 8 records each
-  for (let i = 0; i < 4; i++) {
-    // Create records sequentially in this chunk
-    try {
-      createFinancialRecord(orgId, 8);
-    } catch (error) {
-      console.log(`Error creating financial record: ${error}`);
-    }
-  }
+  createFinancialRecords(orgId, 400);
 }
