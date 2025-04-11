@@ -75,7 +75,7 @@ function selectRandomTags(tags, count) {
 }
 
 // Function to create a financial records
-function createFinancialRecords(orgId, count) {
+export function createFinancialRecords(orgId, count) {
   const tags = getAllTags(orgId);
   let payloads = [];
 
