@@ -23,6 +23,9 @@ func main() {
 
 	// Auto migrate the schema
 	db.AutoMigrate(&Tag{}, &FinancialRecord{})
+	
+	// Apply database indexes
+	ApplyIndexes(db)
 
 	// Initialize router
 	r := gin.Default()

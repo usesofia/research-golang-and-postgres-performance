@@ -2,7 +2,7 @@
 
 # Default values
 TEST_NUMBER=${1:-0}
-DURATION=${2:-30s}
+DURATION=${2:-60s}
 
 echo "Running test ${TEST_NUMBER} for ${DURATION}..."
 
