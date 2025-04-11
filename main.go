@@ -22,7 +22,43 @@ func main() {
 	}
 
 	// Auto migrate the schema
-	db.AutoMigrate(&Tag{}, &FinancialRecord{})
+	db.AutoMigrate(&Tag{}, &FinancialRecord{},
+		// E-commerce Domain
+		&Product{}, &Category{}, &Customer{}, &Order{}, &OrderItem{}, &Image{}, &Address{}, &Transaction{},
+		// Healthcare Domain
+		&Patient{}, &Doctor{}, &Appointment{}, &Prescription{}, &Medication{},
+		// Education Domain
+		&Student{}, &Course{}, &Teacher{}, &Grade{}, &Assignment{},
+		// Transportation Domain
+		&Vehicle{}, &Driver{}, &Trip{}, &Passenger{},
+		// Social Media Domain
+		&User{}, &Post{}, &Comment{}, &Follow{}, &Attachment{},
+		// Human Resources Domain
+		&Employee{}, &Department{}, &Position{}, &Leave{}, &Evaluation{},
+		// Content Management Domain
+		&Website{}, &Page{}, &MenuItem{},
+		// IoT & Smart Home Domain
+		&Device{}, &Home{}, &Room{}, &DeviceReading{},
+		// Fitness & Wellness Domain
+		&Workout{}, &Exercise{}, &WorkoutExercise{}, &MealPlan{}, &Meal{}, &MealFood{},
+		// Finance Domain
+		&Budget{}, &BudgetCategory{}, &Invoice{}, &InvoiceItem{},
+		// Real Estate Domain
+		&Property{}, &Listing{}, &Agent{},
+		// Hospitality Domain
+		&Hotel{}, &HotelRoom{}, &Booking{}, &Guest{},
+		// Event Management Domain
+		&Event{}, &Ticket{}, &EventSession{}, &Speaker{},
+		// Manufacturing Domain
+		&Component{}, &Supplier{},
+		// Logistics Domain
+		&Shipment{}, &Package{}, &Carrier{},
+		// Project Management Domain
+		&Project{}, &Task{}, &Milestone{}, &TeamMember{},
+		// Legal Domain
+		&Contract{}, &Clause{}, &LegalEntity{},
+		// Agriculture Domain
+		&Farm{}, &Field{}, &Livestock{})
 	
 	// Apply database indexes
 	ApplyIndexes(db)
