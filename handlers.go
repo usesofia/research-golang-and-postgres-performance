@@ -197,8 +197,8 @@ func getCashFlowReport(db *gorm.DB) gin.HandlerFunc {
 			SELECT 
 				EXTRACT(YEAR FROM due_date)::integer as year,
 				EXTRACT(MONTH FROM due_date)::integer as month,
-				SUM(CASE WHEN direction = 'IN' THEN amount ELSE 0 END) as in_amount,
-				SUM(CASE WHEN direction = 'OUT' THEN amount ELSE 0 END) as out_amount
+				SUM(CASE WHEN direction = 'IN' THEN amount ELSE 0 END) as in,
+				SUM(CASE WHEN direction = 'OUT' THEN amount ELSE 0 END) as out
 			FROM financial_records
 			WHERE organization_id = ? AND due_date >= ?
 			GROUP BY EXTRACT(YEAR FROM due_date), EXTRACT(MONTH FROM due_date)
@@ -210,15 +210,7 @@ func getCashFlowReport(db *gorm.DB) gin.HandlerFunc {
 
 		// Map the database results to our response structure
 		report := CashFlowReport{
-			MonthlyData: make([]MonthlyCashFlow, len(monthlyData)),
-		}
-		for i, data := range monthlyData {
-			report.MonthlyData[i] = MonthlyCashFlow{
-				Year:  data.Year,
-				Month: data.Month,
-				In:    data.In,
-				Out:   data.Out,
-			}
+			MonthlyData: monthlyData,
 		}
 
 		c.JSON(http.StatusOK, report)
