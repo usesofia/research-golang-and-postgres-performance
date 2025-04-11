@@ -22,7 +22,7 @@ var router *gin.Engine
 func TestMain(m *testing.M) {
 	// Setup test environment
 	gin.SetMode(gin.TestMode)
-	
+
 	// Use a test database
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
@@ -38,47 +38,11 @@ func TestMain(m *testing.M) {
 
 	// Migrate the schema
 	// Auto migrate the schema
-	testDB.AutoMigrate(&Tag{}, &FinancialRecord{},
-		// E-commerce Domain
-		&Product{}, &Category{}, &Customer{}, &Order{}, &OrderItem{}, &Image{}, &Address{}, &Transaction{},
-		// Healthcare Domain
-		&Patient{}, &Doctor{}, &Appointment{}, &Prescription{}, &Medication{},
-		// Education Domain
-		&Student{}, &Course{}, &Teacher{}, &Grade{}, &Assignment{},
-		// Transportation Domain
-		&Vehicle{}, &Driver{}, &Trip{}, &Passenger{},
-		// Social Media Domain
-		&User{}, &Post{}, &Comment{}, &Follow{}, &Attachment{},
-		// Human Resources Domain
-		&Employee{}, &Department{}, &Position{}, &Leave{}, &Evaluation{},
-		// Content Management Domain
-		&Website{}, &Page{}, &MenuItem{},
-		// IoT & Smart Home Domain
-		&Device{}, &Home{}, &Room{}, &DeviceReading{},
-		// Fitness & Wellness Domain
-		&Workout{}, &Exercise{}, &WorkoutExercise{}, &MealPlan{}, &Meal{}, &MealFood{},
-		// Finance Domain
-		&Budget{}, &BudgetCategory{}, &Invoice{}, &InvoiceItem{},
-		// Real Estate Domain
-		&Property{}, &Listing{}, &Agent{},
-		// Hospitality Domain
-		&Hotel{}, &HotelRoom{}, &Booking{}, &Guest{},
-		// Event Management Domain
-		&Event{}, &Ticket{}, &EventSession{}, &Speaker{},
-		// Manufacturing Domain
-		&Component{}, &Supplier{},
-		// Logistics Domain
-		&Shipment{}, &Package{}, &Carrier{},
-		// Project Management Domain
-		&Project{}, &Task{}, &Milestone{}, &TeamMember{},
-		// Legal Domain
-		&Contract{}, &Clause{}, &LegalEntity{},
-		// Agriculture Domain
-		&Farm{}, &Field{}, &Livestock{})
-	
+	testDB.AutoMigrate(&Tag{}, &FinancialRecord{})
+
 	// Apply database indexes
 	ApplyIndexes(testDB)
-	
+
 	// Setup router with routes
 	router = gin.Default()
 	router.POST("/organizations/:organizationId/tags", createTag(testDB))
@@ -87,13 +51,13 @@ func TestMain(m *testing.M) {
 	router.POST("/organizations/:organizationId/financial-records/bulk", createFinancialRecordsBulk(testDB))
 	router.GET("/organizations/:organizationId/financial-records", listFinancialRecords(testDB))
 	router.GET("/organizations/:organizationId/financial-records/reports/cash-flow", getCashFlowReport(testDB))
-	
+
 	// Run tests
 	exitCode := m.Run()
-	
+
 	// Clean up database after tests
 	cleanupTestDB()
-	
+
 	os.Exit(exitCode)
 }
 
@@ -112,31 +76,31 @@ func clearTables() {
 
 func TestCreateTag(t *testing.T) {
 	clearTables()
-	
+
 	// Create test data
 	tag := map[string]interface{}{
 		"name": "Test Tag",
 	}
 	jsonData, _ := json.Marshal(tag)
-	
+
 	// Create request
 	req := httptest.NewRequest("POST", "/organizations/1/tags", bytes.NewBuffer(jsonData))
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// Create response recorder
 	w := httptest.NewRecorder()
-	
+
 	// Serve the request
 	router.ServeHTTP(w, req)
-	
+
 	// Assert response
 	assert.Equal(t, http.StatusCreated, w.Code)
-	
+
 	// Parse response
 	var response Tag
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.Nil(t, err)
-	
+
 	// Validate response
 	assert.Equal(t, "Test Tag", response.Name)
 	assert.Equal(t, uint(1), response.OrganizationID)
@@ -145,26 +109,26 @@ func TestCreateTag(t *testing.T) {
 
 func TestListTags(t *testing.T) {
 	clearTables()
-	
+
 	// Create test data
 	testDB.Create(&Tag{Name: "Tag 1", OrganizationID: 1})
 	testDB.Create(&Tag{Name: "Tag 2", OrganizationID: 1})
-	
+
 	// Create request
 	req := httptest.NewRequest("GET", "/organizations/1/tags", nil)
-	
+
 	// Create response recorder
 	w := httptest.NewRecorder()
-	
+
 	// Serve the request
 	router.ServeHTTP(w, req)
-	
+
 	// Assert response
 	assert.Equal(t, http.StatusOK, w.Code)
-	
+
 	// Parse response
 	var response struct {
-		Data []Tag `json:"data"`
+		Data       []Tag `json:"data"`
 		Pagination struct {
 			CurrentPage int   `json:"current_page"`
 			PageSize    int   `json:"page_size"`
@@ -174,12 +138,12 @@ func TestListTags(t *testing.T) {
 	}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.Nil(t, err)
-	
+
 	// Validate response
 	assert.Len(t, response.Data, 2)
 	assert.Equal(t, "Tag 1", response.Data[0].Name)
 	assert.Equal(t, "Tag 2", response.Data[1].Name)
-	
+
 	// Validate pagination
 	assert.Equal(t, 1, response.Pagination.CurrentPage)
 	assert.Equal(t, 20, response.Pagination.PageSize)
@@ -189,11 +153,11 @@ func TestListTags(t *testing.T) {
 
 func TestCreateFinancialRecord(t *testing.T) {
 	clearTables()
-	
+
 	// Create test data - first create a tag
 	tag := Tag{Name: "Expense Tag", OrganizationID: 1}
 	testDB.Create(&tag)
-	
+
 	// Create financial record with tag
 	record := map[string]interface{}{
 		"direction": "OUT",
@@ -202,25 +166,25 @@ func TestCreateFinancialRecord(t *testing.T) {
 		"tags":      []map[string]interface{}{{"id": tag.ID}},
 	}
 	jsonData, _ := json.Marshal(record)
-	
+
 	// Create request
 	req := httptest.NewRequest("POST", "/organizations/1/financial-records", bytes.NewBuffer(jsonData))
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// Create response recorder
 	w := httptest.NewRecorder()
-	
+
 	// Serve the request
 	router.ServeHTTP(w, req)
-	
+
 	// Assert response
 	assert.Equal(t, http.StatusCreated, w.Code)
-	
+
 	// Parse response
 	var response FinancialRecord
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.Nil(t, err)
-	
+
 	// Validate response
 	assert.Equal(t, "OUT", response.Direction)
 	assert.Equal(t, 100.50, response.Amount)
@@ -229,13 +193,13 @@ func TestCreateFinancialRecord(t *testing.T) {
 
 func TestCreateFinancialRecordsBulk(t *testing.T) {
 	clearTables()
-	
+
 	// Create test data - first create tags
 	tag1 := Tag{Name: "Income Tag", OrganizationID: 1}
 	tag2 := Tag{Name: "Expense Tag", OrganizationID: 1}
 	testDB.Create(&tag1)
 	testDB.Create(&tag2)
-	
+
 	// Create financial records with tags
 	records := []map[string]interface{}{
 		{
@@ -252,25 +216,25 @@ func TestCreateFinancialRecordsBulk(t *testing.T) {
 		},
 	}
 	jsonData, _ := json.Marshal(records)
-	
+
 	// Create request
 	req := httptest.NewRequest("POST", "/organizations/1/financial-records/bulk", bytes.NewBuffer(jsonData))
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// Create response recorder
 	w := httptest.NewRecorder()
-	
+
 	// Serve the request
 	router.ServeHTTP(w, req)
-	
+
 	// Assert response
 	assert.Equal(t, http.StatusCreated, w.Code)
-	
+
 	// Parse response
 	var response []FinancialRecord
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.Nil(t, err)
-	
+
 	// Validate response
 	assert.Len(t, response, 2)
 	assert.Equal(t, "IN", response[0].Direction)
@@ -279,11 +243,11 @@ func TestCreateFinancialRecordsBulk(t *testing.T) {
 
 func TestListFinancialRecords(t *testing.T) {
 	clearTables()
-	
+
 	// Create test data
 	tag := Tag{Name: "Test Tag", OrganizationID: 1}
 	testDB.Create(&tag)
-	
+
 	record1 := FinancialRecord{
 		Direction:      "IN",
 		Amount:         1000.0,
@@ -292,7 +256,7 @@ func TestListFinancialRecords(t *testing.T) {
 	}
 	testDB.Create(&record1)
 	testDB.Exec("INSERT INTO financial_record_tags (financial_record_id, tag_id) VALUES (?, ?)", record1.ID, tag.ID)
-	
+
 	record2 := FinancialRecord{
 		Direction:      "OUT",
 		Amount:         500.0,
@@ -300,29 +264,29 @@ func TestListFinancialRecords(t *testing.T) {
 		OrganizationID: 1,
 	}
 	testDB.Create(&record2)
-	
+
 	// Create request
 	req := httptest.NewRequest("GET", "/organizations/1/financial-records?page=1&page_size=10", nil)
-	
+
 	// Create response recorder
 	w := httptest.NewRecorder()
-	
+
 	// Serve the request
 	router.ServeHTTP(w, req)
-	
+
 	// Assert response
 	assert.Equal(t, http.StatusOK, w.Code)
-	
+
 	// Parse response
 	var response map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.Nil(t, err)
-	
+
 	// Validate response
 	records, ok := response["data"].([]interface{})
 	assert.True(t, ok)
 	assert.Len(t, records, 2)
-	
+
 	pagination, ok := response["pagination"].(map[string]interface{})
 	assert.True(t, ok)
 	assert.Equal(t, float64(1), pagination["current_page"])
@@ -331,11 +295,11 @@ func TestListFinancialRecords(t *testing.T) {
 
 func TestCashFlowReport(t *testing.T) {
 	clearTables()
-	
+
 	// Create test data
 	now := time.Now()
 	lastMonth := now.AddDate(0, -1, 0)
-	
+
 	// Create records for current month
 	testDB.Create(&FinancialRecord{
 		Direction:      "IN",
@@ -349,7 +313,7 @@ func TestCashFlowReport(t *testing.T) {
 		DueDate:        now,
 		OrganizationID: 1,
 	})
-	
+
 	// Create records for last month
 	testDB.Create(&FinancialRecord{
 		Direction:      "IN",
@@ -363,31 +327,31 @@ func TestCashFlowReport(t *testing.T) {
 		DueDate:        lastMonth,
 		OrganizationID: 1,
 	})
-	
+
 	// Create request
 	req := httptest.NewRequest("GET", "/organizations/1/financial-records/reports/cash-flow", nil)
-	
+
 	// Create response recorder
 	w := httptest.NewRecorder()
-	
+
 	// Serve the request
 	router.ServeHTTP(w, req)
-	
+
 	// Assert response
 	assert.Equal(t, http.StatusOK, w.Code)
-	
+
 	// Parse response
 	var response CashFlowReport
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.Nil(t, err)
-	
+
 	// Validate response has monthly data
 	assert.GreaterOrEqual(t, len(response.MonthlyData), 2)
-	
+
 	// Find current month and last month data
 	currentYearMonth := fmt.Sprintf("%d-%d", now.Year(), int(now.Month()))
 	lastYearMonth := fmt.Sprintf("%d-%d", lastMonth.Year(), int(lastMonth.Month()))
-	
+
 	foundCurrent := false
 	foundLast := false
 
@@ -403,6 +367,6 @@ func TestCashFlowReport(t *testing.T) {
 			assert.InDelta(t, 800.0, data.Out, 0.01)
 		}
 	}
-	
+
 	assert.True(t, foundCurrent || foundLast, "Should find data for current month or last month")
-} 
+}
